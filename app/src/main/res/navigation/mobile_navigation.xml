@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_panic">
+
+    <fragment
+        android:id="@+id/nav_emergency_contacts"
+        android:name="com.example.carekeeper.ui.emergency.EmergencyContactsFragment"
+        android:label="Contatos de Emergência" />
+
+    <fragment
+        android:id="@+id/nav_panic"
+        android:name="com.example.carekeeper.ui.panic.PanicButtonFragment"
+        android:label="Pânico" />
+
+    <fragment
+        android:id="@+id/nav_settings"
+        android:name="com.example.carekeeper.ui.settings.SettingsFragment"
+        android:label="Configurações" />
+</navigation>

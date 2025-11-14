@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">carekeeper</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+    <string name="menu_emergency">Contatos</string>
+    <string name="menu_slideshow">Slideshow</string>
+    <string name="menu_settings">Settings</string>
+    <string name="emergency_icon">Ícone do contato de emergência</string>
+    <string name="lorem_ipsum_title">Lorem Ipsum"</string>
+    <string name="lorem_ipsum">Lorem Ipsum is simply placeholder text of the printing and
+        typesetting industry. Lorem Ipsum has been the industry\'s standard placeholder text ever
+        since the 1500s, when an unknown printer took a galley of type and scrambled it to make a
+        type specimen book"
+    </string>
+    <string name="fab_content_description">Represents a view to invoke an action</string>
+    <string name="image_view_item_transform_content_description">Represents an image view in the
+        item
+    </string>
+    <string name="p_nico">PÂNICO</string>
+    <string name="p_nico_lower">Pânico</string>
+    <string name="contatos_de_emerg_ncia">Contatos de Emergência</string>
+    <string name="ligar">Ligar</string>
+    <string name="pol_cia">Polícia</string>
+    <string name="cone">Ícone</string>
+    <string name="bot_o_de_joinha">Botão de Joinha</string>
+    <string name="status">Status</string>
+    <string name="confirme_se_est_tudo_bem_caso_n_o_cancele_em_10_segundos_o_alerta_ser_enviado_automaticamente">Confirme se está tudo bem. Caso não cancele em 10 segundos, o alerta será enviado automaticamente.</string>
+    <string name="poss_vel_acidente_detectado">Possível acidente detectado!</string>
+</resources>
