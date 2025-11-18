@@ -17,7 +17,6 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.example.carekeeper.databinding.ActivityMainBinding;
-import com.example.carekeeper.receiver.AccidentReceiver;
 import com.example.carekeeper.service.SensorService;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
@@ -25,7 +24,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_LOCATION_PERMISSION = 100;
     private AppBarConfiguration appBarConfiguration;
-    private AccidentReceiver accidentReceiver;
 
     @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     @Override
@@ -51,20 +49,6 @@ public class MainActivity extends AppCompatActivity {
 
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
         NavigationUI.setupWithNavController(bottomNavigationView, navController);
-
-        // 🚀 Inicia o serviço de sensores (com checagem de permissão)
-        iniciarServicoSensores();
-
-        // 📡 Registra o receiver para o broadcast de acidente detectado
-        accidentReceiver = new AccidentReceiver();
-        IntentFilter filter = new IntentFilter("com.example.carekeeper.ACCIDENT_DETECTED");
-
-        // ✅ Correção Android 12+ (requer flag explícita)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(accidentReceiver, filter, Context.RECEIVER_EXPORTED);
-        } else {
-            registerReceiver(accidentReceiver, filter);
-        }
     }
 
     private void iniciarServicoSensores() {
@@ -89,14 +73,6 @@ public class MainActivity extends AppCompatActivity {
             startForegroundService(serviceIntent);
         } else {
             startService(serviceIntent);
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (accidentReceiver != null) {
-            unregisterReceiver(accidentReceiver);
         }
     }
 

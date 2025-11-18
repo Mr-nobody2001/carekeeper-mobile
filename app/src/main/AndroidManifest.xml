@@ -13,6 +13,7 @@
     <!-- 📍 Localização -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- ⚙️ Serviços em foreground -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -22,8 +23,16 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
 
-    <!-- 🪟 Permissão para exibir janelas sobre outros apps -->
+    <!-- 🪟 Exibir sobre outros apps (usar com cuidado) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- 📸 Permissão moderna para ler imagens (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <!-- 🧾 Permissão antiga (para Android <= 12) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
 
     <application
         android:allowBackup="true"
@@ -43,26 +52,11 @@
             android:exported="true"
             android:resizeableActivity="true"
             android:theme="@style/Theme.Carekeeper.NoActionBar">
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- 🚨 Popup de confirmação de acidente -->
-        <activity
-            android:name=".ui.AccidentPopupActivity"
-            android:exported="true"
-            android:theme="@style/Theme.AppCompat.Dialog.Alert"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:excludeFromRecents="true"
-            android:launchMode="singleInstance"
-            android:taskAffinity=""
-            android:windowSoftInputMode="stateHidden"
-            android:finishOnTaskLaunch="true"
-            android:screenOrientation="portrait" />
 
         <!-- ⚙️ Serviço de sensores -->
         <service
@@ -76,17 +70,6 @@
             android:name=".service.VibrationService"
             android:enabled="true"
             android:exported="false" />
-
-        <!-- 📡 Receiver que escuta o broadcast de acidente detectado -->
-        <receiver
-            android:name=".receiver.AccidentReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_STICKY">
-            <intent-filter>
-                <action android:name="com.example.carekeeper.ACCIDENT_DETECTED" />
-            </intent-filter>
-        </receiver>
 
     </application>
 </manifest>

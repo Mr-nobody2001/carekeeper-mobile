@@ -30,4 +30,7 @@
     <string name="status">Status</string>
     <string name="confirme_se_est_tudo_bem_caso_n_o_cancele_em_10_segundos_o_alerta_ser_enviado_automaticamente">Confirme se está tudo bem. Caso não cancele em 10 segundos, o alerta será enviado automaticamente.</string>
     <string name="poss_vel_acidente_detectado">Possível acidente detectado!</string>
+    <string name="telefone">Telefone</string>
+    <string name="nome">Nome</string>
+    <string name="adicionar_contato">Adicionar contato</string>
 </resources>
