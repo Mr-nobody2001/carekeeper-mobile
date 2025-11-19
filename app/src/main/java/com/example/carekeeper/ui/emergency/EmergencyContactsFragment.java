@@ -2,9 +2,7 @@ package com.example.carekeeper.ui.emergency;
 
 import android.Manifest;
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -30,23 +28,19 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.carekeeper.R;
+import com.example.carekeeper.service.SharedPreferencesService;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.imageview.ShapeableImageView;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
 public class EmergencyContactsFragment extends Fragment {
 
-    private static final String PREFS_NAME = "emergency_contacts_prefs";
-    private static final String KEY_CUSTOM_CONTACTS = "custom_contacts";
-    private static final int MAX_CUSTOM_CONTACTS = 3;
-
     private String numeroPendendeLigacao = null;
     private EmergencyContactsAdapter adapter;
+    private SharedPreferencesService prefsService;
 
     private final List<EmergencyContact> contacts = new ArrayList<>();
     private final List<EmergencyContact> customContacts = new ArrayList<>();
@@ -55,17 +49,30 @@ public class EmergencyContactsFragment extends Fragment {
     private ShapeableImageView imagePreview;
     private ActivityResultLauncher<Intent> seletorImagemLauncher;
 
+    private int maxCustomContacts = 3; // valor padrão
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_emergency_contacts, container, false);
+
+        // Serviço de preferências
+        prefsService = new SharedPreferencesService(requireContext());
+
+        // 🔹 Puxa o limite salvo nas configs (padrão 3)
+        maxCustomContacts = prefsService.getMaxCustomContacts();
+
+        // Limpa listas para evitar duplicação
+        contacts.clear();
+        customContacts.clear();
 
         // Contatos fixos
         contacts.add(new EmergencyContact("Polícia", "190", null, R.drawable.ic_police_car));
         contacts.add(new EmergencyContact("SAMU", "192", null, R.drawable.ic_ambulance));
         contacts.add(new EmergencyContact("Bombeiros", "193", null, R.drawable.ic_fire_truck));
 
-        carregarContatosPersonalizados();
+        // Carrega contatos personalizados do serviço
+        customContacts.addAll(prefsService.carregarContatosPersonalizados());
 
         RecyclerView recyclerView = root.findViewById(R.id.recyclerViewEmergencyContacts);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -73,30 +80,28 @@ public class EmergencyContactsFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         // Swipe para deletar
-        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView,
                                   @NonNull RecyclerView.ViewHolder viewHolder,
                                   @NonNull RecyclerView.ViewHolder target) {
-                return false; // não vamos mover itens
+                return false;
             }
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
-                if (position >= contacts.size()) { // apenas contatos personalizados
+                if (position >= contacts.size()) {
                     EmergencyContact removed = customContacts.remove(position - contacts.size());
-                    salvarContatosPersonalizados();
+                    prefsService.salvarContatosPersonalizados(customContacts);
                     adapter.notifyItemRemoved(position);
                     Toast.makeText(getContext(), "Contato removido: " + removed.name, Toast.LENGTH_SHORT).show();
                 } else {
-                    adapter.notifyItemChanged(position); // não permite remover contatos fixos
+                    adapter.notifyItemChanged(position);
                 }
             }
-        });
-        itemTouchHelper.attachToRecyclerView(recyclerView);
+        }).attachToRecyclerView(recyclerView);
 
-        // Launcher para selecionar imagens da galeria
         seletorImagemLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -104,19 +109,14 @@ public class EmergencyContactsFragment extends Fragment {
                         imagemSelecionada = result.getData().getData();
                         if (imagemSelecionada != null && imagePreview != null) {
                             imagePreview.setImageURI(imagemSelecionada);
-
-                            final int takeFlags = result.getData().getFlags()
-                                    & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                             try {
                                 requireContext().getContentResolver()
-                                        .takePersistableUriPermission(imagemSelecionada, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            } catch (SecurityException e) {
-                                e.printStackTrace();
-                            }
+                                        .takePersistableUriPermission(imagemSelecionada,
+                                                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            } catch (SecurityException ignored) {}
                         }
                     }
-                }
-        );
+                });
 
         FloatingActionButton fabAdd = root.findViewById(R.id.fabAddContact);
         fabAdd.setOnClickListener(v -> mostrarDialogoAdicionarContato());
@@ -125,18 +125,18 @@ public class EmergencyContactsFragment extends Fragment {
     }
 
     private void mostrarDialogoAdicionarContato() {
-        if (customContacts.size() >= MAX_CUSTOM_CONTACTS) {
-            Toast.makeText(getContext(), "Você só pode adicionar até 3 contatos personalizados.", Toast.LENGTH_LONG).show();
+        if (customContacts.size() >= maxCustomContacts) {
+            Toast.makeText(getContext(),
+                    "Você só pode adicionar até " + maxCustomContacts + " contatos personalizados.",
+                    Toast.LENGTH_LONG).show();
             return;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            mostrarDialogoContato(null);
-        }
+        mostrarDialogoContato(null);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     private void mostrarDialogoContato(EmergencyContact contatoExistente) {
-        imagemSelecionada = contatoExistente != null && contatoExistente.imageUri != null
+        imagemSelecionada = (contatoExistente != null && contatoExistente.imageUri != null)
                 ? Uri.parse(contatoExistente.imageUri)
                 : null;
 
@@ -144,6 +144,8 @@ public class EmergencyContactsFragment extends Fragment {
         EditText editName = dialogView.findViewById(R.id.editContactName);
         EditText editPhone = dialogView.findViewById(R.id.editContactPhone);
         imagePreview = dialogView.findViewById(R.id.imageContactPreview);
+        MaterialButton btnSalvar = dialogView.findViewById(R.id.btnSalvar);
+        MaterialButton btnCancelar = dialogView.findViewById(R.id.btnCancelar);
 
         editName.setFilters(new InputFilter[]{new InputFilter.LengthFilter(50)});
 
@@ -153,9 +155,9 @@ public class EmergencyContactsFragment extends Fragment {
             if (contatoExistente.imageUri != null)
                 imagePreview.setImageURI(Uri.parse(contatoExistente.imageUri));
             else
-                imagePreview.setImageResource(R.drawable.add_image);
+                imagePreview.setImageResource(R.drawable.circle_user);
         } else {
-            imagePreview.setImageResource(R.drawable.add_image);
+            imagePreview.setImageResource(R.drawable.circle_user);
         }
 
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_MEDIA_IMAGES)
@@ -166,47 +168,50 @@ public class EmergencyContactsFragment extends Fragment {
         editPhone.setKeyListener(DigitsKeyListener.getInstance("0123456789"));
         editPhone.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
         adicionarMascaraTelefone(editPhone);
-
         imagePreview.setOnClickListener(v -> abrirGaleria());
 
-        new AlertDialog.Builder(requireContext())
-                .setTitle(contatoExistente == null ? "Adicionar contato de emergência" : "Editar contato")
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
                 .setView(dialogView)
-                .setPositiveButton("Salvar", (dialog, which) -> {
-                    String name = editName.getText().toString().trim();
-                    String phone = editPhone.getText().toString().replaceAll("\\D", "");
+                .create();
 
-                    if (name.isEmpty()) {
-                        Toast.makeText(getContext(), "Informe o nome.", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+        dialog.show();
 
-                    if (phone.length() < 10) {
-                        Toast.makeText(getContext(), "Número de telefone inválido.", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+        btnSalvar.setOnClickListener(v -> {
+            String name = editName.getText().toString().trim();
+            String phone = editPhone.getText().toString().replaceAll("\\D", "");
 
-                    if (contatoExistente == null) {
-                        EmergencyContact novo = new EmergencyContact(
-                                name,
-                                phone,
-                                imagemSelecionada != null ? imagemSelecionada.toString() : null,
-                                R.drawable.default_contact_image
-                        );
-                        customContacts.add(novo);
-                        Toast.makeText(getContext(), "Contato adicionado!", Toast.LENGTH_SHORT).show();
-                    } else {
-                        contatoExistente.name = name;
-                        contatoExistente.phone = phone;
-                        contatoExistente.imageUri = imagemSelecionada != null ? imagemSelecionada.toString() : null;
-                        Toast.makeText(getContext(), "Contato atualizado!", Toast.LENGTH_SHORT).show();
-                    }
+            if (name.isEmpty()) {
+                Toast.makeText(getContext(), "Informe o nome.", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-                    salvarContatosPersonalizados();
-                    adapter.notifyDataSetChanged();
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
+            if (phone.length() < 10) {
+                Toast.makeText(getContext(), "Número de telefone inválido.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (contatoExistente == null) {
+                EmergencyContact novo = new EmergencyContact(
+                        name,
+                        phone,
+                        imagemSelecionada != null ? imagemSelecionada.toString() : null,
+                        R.drawable.circle_user
+                );
+                customContacts.add(novo);
+                Toast.makeText(getContext(), "Contato adicionado!", Toast.LENGTH_SHORT).show();
+            } else {
+                contatoExistente.name = name;
+                contatoExistente.phone = phone;
+                contatoExistente.imageUri = imagemSelecionada != null ? imagemSelecionada.toString() : null;
+                Toast.makeText(getContext(), "Contato atualizado!", Toast.LENGTH_SHORT).show();
+            }
+
+            prefsService.salvarContatosPersonalizados(customContacts);
+            adapter.notifyDataSetChanged();
+            dialog.dismiss();
+        });
+
+        btnCancelar.setOnClickListener(v -> dialog.dismiss());
     }
 
     private void abrirGaleria() {
@@ -230,10 +235,8 @@ public class EmergencyContactsFragment extends Fragment {
                 StringBuilder masked = new StringBuilder();
 
                 if (!digits.isEmpty()) masked.append("(");
-                if (!digits.isEmpty())
-                    masked.append(digits.substring(0, Math.min(2, digits.length())));
-                if (digits.length() >= 3)
-                    masked.append(") ");
+                if (!digits.isEmpty()) masked.append(digits.substring(0, Math.min(2, digits.length())));
+                if (digits.length() >= 3) masked.append(") ");
                 if (digits.length() > 2 && digits.length() <= 6)
                     masked.append(digits.substring(2));
                 else if (digits.length() > 6) {
@@ -258,30 +261,28 @@ public class EmergencyContactsFragment extends Fragment {
         return digits;
     }
 
-    private void salvarContatosPersonalizados() {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        String json = new Gson().toJson(customContacts);
-        editor.putString(KEY_CUSTOM_CONTACTS, json);
-        editor.apply();
-    }
-
-    private void carregarContatosPersonalizados() {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String json = prefs.getString(KEY_CUSTOM_CONTACTS, null);
-        if (json != null) {
-            Type listType = new TypeToken<ArrayList<EmergencyContact>>() {}.getType();
-            List<EmergencyContact> savedContacts = new Gson().fromJson(json, listType);
-            if (savedContacts != null) customContacts.addAll(savedContacts);
+    private void ligarNumero(String numero) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_CALL);
+            intent.setData(Uri.parse("tel:" + numero));
+            startActivity(intent);
+        } catch (SecurityException e) {
+            Toast.makeText(getContext(), "Permissão negada para ligar", Toast.LENGTH_SHORT).show();
         }
     }
 
-    public String getNumeroPendendeLigacao() {
-        return numeroPendendeLigacao;
-    }
+    public static class EmergencyContact {
+        public String name;
+        public String phone;
+        public String imageUri;
+        public final int iconRes;
 
-    public void setNumeroPendendeLigacao(String numeroPendendeLigacao) {
-        this.numeroPendendeLigacao = numeroPendendeLigacao;
+        public EmergencyContact(String name, String phone, String imageUri, int iconRes) {
+            this.name = name;
+            this.phone = phone;
+            this.imageUri = imageUri;
+            this.iconRes = iconRes;
+        }
     }
 
     private class EmergencyContactsAdapter extends RecyclerView.Adapter<EmergencyContactsAdapter.ViewHolder> {
@@ -300,20 +301,15 @@ public class EmergencyContactsFragment extends Fragment {
                     : customContacts.get(position - contacts.size());
 
             holder.name.setText(contact.name);
+            holder.icon.setImageResource(R.drawable.circle_user);
 
-            // Sempre define a imagem padrão
-            holder.icon.setImageResource(R.drawable.default_contact_image);
-
-            // Contatos fixos com ícones
             if (position < contacts.size()) {
                 holder.icon.setImageResource(contact.iconRes);
-            }
-            // Contatos personalizados com imagem selecionada
-            else if (contact.imageUri != null) {
+            } else if (contact.imageUri != null) {
                 try {
                     holder.icon.setImageURI(Uri.parse(contact.imageUri));
                 } catch (Exception e) {
-                    holder.icon.setImageResource(R.drawable.default_contact_image);
+                    holder.icon.setImageResource(R.drawable.circle_user);
                 }
             }
 
@@ -329,9 +325,7 @@ public class EmergencyContactsFragment extends Fragment {
 
             if (position >= contacts.size()) {
                 holder.itemView.setOnLongClickListener(v -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        mostrarDialogoContato(customContacts.get(position - contacts.size()));
-                    }
+                    mostrarDialogoContato(customContacts.get(position - contacts.size()));
                     return true;
                 });
             }
@@ -350,29 +344,6 @@ public class EmergencyContactsFragment extends Fragment {
                 name = itemView.findViewById(R.id.textViewEmergencyName);
                 icon = itemView.findViewById(R.id.imageViewEmergencyIcon);
             }
-        }
-    }
-
-    private void ligarNumero(String numero) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_CALL);
-            intent.setData(Uri.parse("tel:" + numero));
-            startActivity(intent);
-        } catch (SecurityException e) {
-            Toast.makeText(getContext(), "Permissão negada para ligar", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private static class EmergencyContact {
-        String name;
-        String phone;
-        String imageUri;
-        final int iconRes;
-        EmergencyContact(String name, String phone, String imageUri, int iconRes) {
-            this.name = name;
-            this.phone = phone;
-            this.imageUri = imageUri;
-            this.iconRes = iconRes;
         }
     }
 }

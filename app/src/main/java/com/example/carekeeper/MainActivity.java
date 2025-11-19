@@ -1,15 +1,14 @@
 package com.example.carekeeper;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
@@ -18,6 +17,7 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.example.carekeeper.databinding.ActivityMainBinding;
 import com.example.carekeeper.service.SensorService;
+import com.example.carekeeper.service.SharedPreferencesService;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
@@ -28,7 +28,18 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+        // ✅ Aplica o tema salvo antes de inflar o layout
+        SharedPreferencesService prefs = new SharedPreferencesService(this);
+        if (prefs.isDarkThemeEnabled()) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
+        }
+
         super.onCreate(savedInstanceState);
+
+        // ✅ Inflar layout principal
         ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -44,7 +55,8 @@ public class MainActivity extends AppCompatActivity {
 
         appBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_emergency_contacts,
-                R.id.nav_panic
+                R.id.nav_panic,
+                R.id.nav_settings // 🔹 inclui Settings na bottom nav
         ).build();
 
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);

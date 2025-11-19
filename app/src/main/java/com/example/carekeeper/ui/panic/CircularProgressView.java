@@ -2,6 +2,7 @@ package com.example.carekeeper.ui.panic;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
@@ -33,13 +34,13 @@ public class CircularProgressView extends View {
         backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         backgroundPaint.setStyle(Paint.Style.STROKE);
         backgroundPaint.setStrokeWidth(dpToPx(6));
-        backgroundPaint.setColor(0x30FFFF00);
+        backgroundPaint.setColor(Color.TRANSPARENT);
 
         progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         progressPaint.setStyle(Paint.Style.STROKE);
         progressPaint.setStrokeCap(Paint.Cap.ROUND);
         progressPaint.setStrokeWidth(dpToPx(8));
-        progressPaint.setColor(0xFFFFFF00);
+        progressPaint.setColor(0x90E36E1E);
     }
 
     @Override

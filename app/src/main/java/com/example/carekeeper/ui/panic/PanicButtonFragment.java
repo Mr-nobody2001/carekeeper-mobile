@@ -25,10 +25,10 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.carekeeper.R;
+import com.example.carekeeper.dto.PanicAlertRequest;
 import com.example.carekeeper.network.ApiClient;
 import com.example.carekeeper.network.ApiService;
-import com.example.carekeeper.dto.PanicAlertRequest;
-import com.example.carekeeper.service.PanicStateService;
+import com.example.carekeeper.service.SharedPreferencesService;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 
@@ -36,16 +36,10 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-/**
- * Fragment responsável pelo botão de pânico principal do app.
- * - Segurar por 3s para acionar alerta.
- * - Ripple animado em loop (1s) enquanto ativo.
- * - Clique simples após acionado reseta tudo.
- */
 public class PanicButtonFragment extends Fragment {
 
     private static final long HOLD_DURATION_MS = 3000L;
-    private static final long RIPPLE_INTERVAL_MS = 1000L; // intervalo entre ondas
+    private static final long RIPPLE_INTERVAL_MS = 1000L;
 
     private CircularProgressView circularProgress;
     private AppCompatButton panicButton;
@@ -63,10 +57,7 @@ public class PanicButtonFragment extends Fragment {
     private MediaPlayer alertSound;
     private ApiService api;
     private FusedLocationProviderClient fusedLocationClient;
-
-    // ============================================================= //
-    // =============== CICLO DE VIDA DO FRAGMENT =================== //
-    // ============================================================= //
+    private SharedPreferencesService prefs;
 
     @Nullable
     @Override
@@ -85,17 +76,17 @@ public class PanicButtonFragment extends Fragment {
 
         api = ApiClient.getClient().create(ApiService.class);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext());
+        prefs = new SharedPreferencesService(requireContext());
 
-        // carrega estado persistido (se houver)
-        triggered = PanicStateService.triggered;
+        // 🔹 Carrega estado persistido
+        triggered = prefs.isAlertActive();
+        float savedProgress = prefs.getPanicProgress();
 
         if (triggered) {
-            // Se já estava acionado ao abrir fragment, restaura visuais e listeners de reset
-            circularProgress.setProgress(PanicStateService.progress);
+            circularProgress.setProgress(savedProgress);
             startButtonFlashing();
             startAlertSound();
             startRippleLoop();
-            // IMPORTANTE: garantir que o touch listener antigo não esteja consumindo cliques
             panicButton.setOnTouchListener(null);
             setupRestartListener();
         } else {
@@ -104,24 +95,11 @@ public class PanicButtonFragment extends Fragment {
         }
     }
 
-    // ============================================================= //
-    // ==================== LÓGICA DO BOTÃO ======================== //
-    // ============================================================= //
-
-    /**
-     * Cria e associa o OnTouchListener que implementa "segurar para ativar".
-     * Guardamos a instância em `touchListener` para poder removê-la facilmente quando necessário.
-     */
     @SuppressLint("ClickableViewAccessibility")
     private void setupTouchListener() {
-        // remove qualquer click listener anterior (segurança)
         panicButton.setOnClickListener(null);
-
-        // se já estiver acionado, bloqueia o touch default
-        // OnTouchListener reference (guardamos para poder remover/reativar)
-        View.OnTouchListener touchListener = (v, event) -> {
-            if (triggered) return true; // se já estiver acionado, bloqueia o touch default
-
+        panicButton.setOnTouchListener((v, event) -> {
+            if (triggered) return true;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     startHold();
@@ -132,24 +110,22 @@ public class PanicButtonFragment extends Fragment {
                     return true;
             }
             return false;
-        };
-        panicButton.setOnTouchListener(touchListener);
+        });
     }
 
     private void startHold() {
         if (triggered) return;
         isHolding = true;
 
-        float startProgress = PanicStateService.progress;
+        float startProgress = prefs.getPanicProgress();
         float remainingProgress = 1f - startProgress;
 
-        // leve ampliação do botão como feedback
         animateButtonScale(1f, 1.1f, 200);
 
         panicRunnable = () -> {
             triggered = true;
-            PanicStateService.triggered = true;
-            PanicStateService.progress = 1f;
+            prefs.setAlertActive(true);
+            prefs.setPanicProgress(1f);
             isHolding = false;
             onPanicTriggered();
         };
@@ -161,7 +137,7 @@ public class PanicButtonFragment extends Fragment {
         progressAnimator.addUpdateListener(a -> {
             float progress = (float) a.getAnimatedValue();
             circularProgress.setProgress(progress);
-            PanicStateService.progress = progress;
+            prefs.setPanicProgress(progress);
         });
         progressAnimator.start();
     }
@@ -173,72 +149,48 @@ public class PanicButtonFragment extends Fragment {
             progressAnimator.cancel();
             progressAnimator = null;
         }
-
-        // retorna à escala original
         animateButtonScale(1.1f, 1f, 150);
 
         if (!triggered) {
-            PanicStateService.progress = 0f;
+            prefs.setPanicProgress(0f);
             circularProgress.reset();
         }
     }
 
-    /**
-     * Chamado quando o hold chegou ao final e o alerta é disparado.
-     * Removemos o OnTouchListener e configuramos o OnClickListener para reset.
-     */
     @SuppressLint("ClickableViewAccessibility")
     private void onPanicTriggered() {
         circularProgress.setProgress(1f);
-        PanicStateService.progress = 1f;
+        prefs.setPanicProgress(1f);
 
-        // mostra primeira onda imediatamente
         showRippleWaveEffect();
-
-        // inicia loop de ondas, som e piscar
         startRippleLoop();
         startButtonFlashing();
         startAlertSound();
-
-        // envia o alerta (API)
         triggerPanicButton();
 
-        // REMOVER o touch listener para liberar eventos de clique
         panicButton.setOnTouchListener(null);
-
-        // configurar listener de restart/reset (clique simples)
         setupRestartListener();
     }
 
-    /**
-     * Configura o clique simples que resetará tudo caso o alerta esteja ativo.
-     * Garantimos que o OnTouchListener esteja removido antes de registrar esse OnClick.
-     */
     @SuppressLint("ClickableViewAccessibility")
     private void setupRestartListener() {
-        // garantia: se por algum motivo o touchListener ainda estiver, remove
         panicButton.setOnTouchListener(null);
-
         panicButton.setOnClickListener(v -> {
-            if (!triggered) return; // segurança: só reseta se realmente estiver acionado
-
-            // Para som, loop de ripple, animações e reset de estado
+            if (!triggered) return;
             stopAlertSound();
             stopRippleLoop();
             stopButtonFlashing();
             resetButtonState();
-
-            // restaura comportamento original de "segurar para ativar"
             setupTouchListener();
         });
     }
 
     private void resetButtonState() {
         triggered = false;
-        PanicStateService.reset();
+        prefs.setAlertActive(false);
+        prefs.setPanicProgress(0f);
         circularProgress.reset();
 
-        // remove o click listener de reset (evita cliques fantasma)
         panicButton.setOnClickListener(null);
 
         if (flashAnimator != null) {
@@ -249,14 +201,8 @@ public class PanicButtonFragment extends Fragment {
         rippleWave.setVisibility(View.GONE);
     }
 
-    // ============================================================= //
-    // ======================= ANIMAÇÕES =========================== //
-    // ============================================================= //
-
     private void showRippleWaveEffect() {
-        // protege caso view não exista
         if (rippleWave == null) return;
-
         rippleWave.setVisibility(View.VISIBLE);
         rippleWave.setScaleX(0f);
         rippleWave.setScaleY(0f);
@@ -268,7 +214,6 @@ public class PanicButtonFragment extends Fragment {
                 .alpha(0f)
                 .setDuration(700)
                 .withEndAction(() -> {
-                    // apenas esconde se não estiver no meio de novo ciclo
                     if (!triggered) rippleWave.setVisibility(View.GONE);
                 })
                 .start();
@@ -277,7 +222,7 @@ public class PanicButtonFragment extends Fragment {
     }
 
     private void startRippleLoop() {
-        stopRippleLoop(); // garante um loop único
+        stopRippleLoop();
         rippleLoopRunnable = new Runnable() {
             @Override
             public void run() {
@@ -330,10 +275,6 @@ public class PanicButtonFragment extends Fragment {
         scaleY.start();
     }
 
-    // ============================================================= //
-    // =================== SOM E VIBRAÇÃO ========================== //
-    // ============================================================= //
-
     private void startAlertSound() {
         Context context = getSafeContext();
         if (context == null) return;
@@ -342,10 +283,7 @@ public class PanicButtonFragment extends Fragment {
             alertSound = MediaPlayer.create(context, R.raw.alert_sound);
             if (alertSound != null) alertSound.setLooping(true);
         }
-
-        if (alertSound != null && !alertSound.isPlaying()) {
-            alertSound.start();
-        }
+        if (alertSound != null && !alertSound.isPlaying()) alertSound.start();
     }
 
     private void stopAlertSound() {
@@ -363,79 +301,43 @@ public class PanicButtonFragment extends Fragment {
     private void vibrateShort() {
         Context context = getSafeContext();
         if (context == null) return;
-
         Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         if (v != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 v.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE));
-            } else {
-                v.vibrate(150);
-            }
+            else v.vibrate(150);
         }
     }
-
-    // ============================================================= //
-    // ===================== ENVIO DE ALERTA ======================= //
-    // ============================================================= //
 
     private void triggerPanicButton() {
         if (ActivityCompat.checkSelfPermission(requireContext(),
                 android.Manifest.permission.ACCESS_FINE_LOCATION) !=
                 android.content.pm.PackageManager.PERMISSION_GRANTED) {
-
             ActivityCompat.requestPermissions(requireActivity(),
                     new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 1001);
             return;
         }
 
         fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+            double lat = 0, lon = 0;
             if (location != null) {
-                PanicStateService.currentLatitude = location.getLatitude();
-                PanicStateService.currentLongitude = location.getLongitude();
+                lat = location.getLatitude();
+                lon = location.getLongitude();
+                prefs.setLastLocation(lat, lon);
             }
 
             PanicAlertRequest alertDTO = new PanicAlertRequest();
             alertDTO.setLeitura("Botão de pânico acionado");
-            alertDTO.setLatitude(PanicStateService.currentLatitude);
-            alertDTO.setLongitude(PanicStateService.currentLongitude);
+            alertDTO.setLatitude(lat);
+            alertDTO.setLongitude(lon);
 
             api.triggerPanicButton(alertDTO).enqueue(new Callback<>() {
-                @Override
-                public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) { }
-
-                @Override
-                public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
+                @Override public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {}
+                @Override public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
                     t.printStackTrace();
                 }
             });
         });
-    }
-
-    // ============================================================= //
-    // =================== CICLO DE VIDA EXTRA ===================== //
-    // ============================================================= //
-
-    @SuppressLint("ClickableViewAccessibility")
-    @Override
-    public void onResume() {
-        super.onResume();
-
-        if (triggered) {
-            circularProgress.setProgress(PanicStateService.progress);
-            startButtonFlashing();
-            startAlertSound();
-            startRippleLoop();
-            // garantir listener de reset
-            panicButton.setOnTouchListener(null);
-            setupRestartListener();
-        } else {
-            circularProgress.reset();
-        }
-    }
-
-    @Nullable
-    private Context getSafeContext() {
-        return isAdded() ? getContext() : null;
     }
 
     @Override
@@ -454,22 +356,8 @@ public class PanicButtonFragment extends Fragment {
         stopButtonFlashing();
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (requestCode == 1001 &&
-                grantResults.length > 0 &&
-                grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            triggerPanicButton();
-        }
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-    }
-
-    public boolean isHolding() {
-        return isHolding;
-    }
-
-    public void setHolding(boolean holding) {
-        isHolding = holding;
+    @Nullable
+    private Context getSafeContext() {
+        return isAdded() ? getContext() : null;
     }
 }

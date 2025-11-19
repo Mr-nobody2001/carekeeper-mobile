@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="popup_bg_color">#121212</color>
+    <color name="circle_bg_color">#121212</color>
+    <color name="pencil_icon_color">#FFFFFF</color>
+</resources>

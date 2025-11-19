@@ -33,4 +33,10 @@
     <string name="telefone">Telefone</string>
     <string name="nome">Nome</string>
     <string name="adicionar_contato">Adicionar contato</string>
+    <string name="cancelar">Cancelar</string>
+    <string name="salvar">Salvar</string>
+    <string name="ativar_alerta_autom_tico">Ativar alerta automático</string>
+    <string name="m_ximo_de_contatos_personalizados">Máximo de contatos personalizados</string>
+    <string name="configura_es">Configurações</string>
+    <string name="tema_escuro">Tema escuro</string>
 </resources>

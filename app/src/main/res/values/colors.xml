@@ -8,4 +8,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="panic_button_default">#F40000</color>
+    <color name="popup_bg_color">#FFFFFF</color>
+    <color name="circle_bg_color">#FFFFFF</color>
+    <color name="pencil_icon_color">#000000</color>
 </resources>

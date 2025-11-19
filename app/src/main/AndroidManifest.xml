@@ -65,11 +65,5 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- 📳 Serviço opcional de vibração -->
-        <service
-            android:name=".service.VibrationService"
-            android:enabled="true"
-            android:exported="false" />
-
     </application>
 </manifest>
