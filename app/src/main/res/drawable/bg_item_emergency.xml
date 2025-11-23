@@ -1,0 +1,12 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- fundo usando nova cor do tema -->
+    <solid android:color="@color/backgroundDefaultColor" />
+
+    <corners android:radius="12dp" />
+
+    <!-- borda usando cor primária -->
+    <stroke
+        android:width="2dp"
+        android:color="@color/primaryColor" />
+</shape>

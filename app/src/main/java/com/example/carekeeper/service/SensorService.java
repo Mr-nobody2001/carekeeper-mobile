@@ -27,6 +27,8 @@ import com.example.carekeeper.dto.SensorDTO;
 import com.example.carekeeper.network.ApiClient;
 import com.example.carekeeper.network.ApiService;
 
+import java.util.UUID;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -59,8 +61,11 @@ public class SensorService extends Service implements SensorEventListener, Locat
         super.onCreate();
         Log.i(TAG, "Iniciando SensorService...");
 
-        apiService = ApiClient.getClient().create(ApiService.class);
         sharedPreferencesService = new SharedPreferencesService(this);
+
+        // Cria ApiService com JWT
+        apiService = ApiClient.getClientWithAuth(sharedPreferencesService)
+                .create(ApiService.class);
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -121,6 +126,14 @@ public class SensorService extends Service implements SensorEventListener, Locat
     private void enviarLeitura() {
         boolean isAlertActive = sharedPreferencesService.isAlertActive();
 
+        // 🔹 Verifica se o token JWT está salvo
+        String token = sharedPreferencesService.getJwtToken();
+        if (token == null || token.trim().isEmpty()) {
+            Log.w(TAG, "⚠️ Nenhum token JWT encontrado. Ignorando envio da leitura.");
+            return;
+        }
+
+        // 🔹 Monta o DTO com dados dos sensores
         SensorDTO leitura = new SensorDTO(
                 ax, ay, az,
                 gx, gy, gz,
@@ -128,6 +141,7 @@ public class SensorService extends Service implements SensorEventListener, Locat
                 System.currentTimeMillis()
         );
 
+        // 🔹 Envia a leitura normalmente (JWT vai no cabeçalho via interceptor)
         Call<Void> call = apiService.sendReading(leitura, isAlertActive);
 
         call.enqueue(new Callback<>() {
@@ -135,13 +149,8 @@ public class SensorService extends Service implements SensorEventListener, Locat
             public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
                 if (response.isSuccessful()) {
                     Log.i(TAG, "✅ Leitura enviada com sucesso (ativo=" + isAlertActive + ")");
-                    // 🚨 Acidente detectado (HTTP 200)
-
-                    if (!   sharedPreferencesService.isAlertActive()) {
-                        Intent intent = new Intent("com.example.carekeeper.ACCIDENT_DETECTED");
-                        sendBroadcast(intent);
-                        sharedPreferencesService.setAlertActive(false);
-                    }
+                } else if (response.code() == 401) {
+                    Log.w(TAG, "🔒 Token expirado ou inválido. Ignorando leitura até novo login.");
                 } else {
                     Log.w(TAG, "⚠️ Falha no envio: código HTTP " + response.code());
                 }

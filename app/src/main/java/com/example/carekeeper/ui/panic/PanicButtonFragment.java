@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -31,6 +32,8 @@ import com.example.carekeeper.network.ApiService;
 import com.example.carekeeper.service.SharedPreferencesService;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+
+import java.util.UUID;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -74,9 +77,10 @@ public class PanicButtonFragment extends Fragment {
         panicButton = view.findViewById(R.id.panicButton);
         rippleWave = view.findViewById(R.id.rippleWave);
 
-        api = ApiClient.getClient().create(ApiService.class);
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext());
         prefs = new SharedPreferencesService(requireContext());
+
+        api = ApiClient.getClientWithAuth(prefs).create(ApiService.class);
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext());
 
         // 🔹 Carrega estado persistido
         triggered = prefs.isAlertActive();
@@ -318,6 +322,13 @@ public class PanicButtonFragment extends Fragment {
             return;
         }
 
+        // 🔹 Verifica se há token JWT antes de prosseguir
+        String token = prefs.getJwtToken();
+        if (token == null || token.trim().isEmpty()) {
+            Log.w("PanicButton", "⚠️ Nenhum token JWT encontrado. Ignorando envio do alerta.");
+            return;
+        }
+
         fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
             double lat = 0, lon = 0;
             if (location != null) {
@@ -326,15 +337,28 @@ public class PanicButtonFragment extends Fragment {
                 prefs.setLastLocation(lat, lon);
             }
 
+            // 🔹 Monta o corpo do alerta
             PanicAlertRequest alertDTO = new PanicAlertRequest();
             alertDTO.setLeitura("Botão de pânico acionado");
             alertDTO.setLatitude(lat);
             alertDTO.setLongitude(lon);
 
+            // 🔹 Envia requisição (JWT é adicionado automaticamente via interceptor)
             api.triggerPanicButton(alertDTO).enqueue(new Callback<>() {
-                @Override public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {}
-                @Override public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
-                    t.printStackTrace();
+                @Override
+                public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
+                    if (response.isSuccessful()) {
+                        Log.i("PanicButton", "🚨 Alerta de pânico enviado com sucesso!");
+                    } else if (response.code() == 401) {
+                        Log.w("PanicButton", "🔒 Token expirado ou inválido. Ignorando alerta.");
+                    } else {
+                        Log.w("PanicButton", "⚠️ Falha ao enviar alerta: código " + response.code());
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
+                    Log.e("PanicButton", "❌ Erro ao enviar alerta: " + t.getMessage());
                 }
             });
         });

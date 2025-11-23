@@ -2,7 +2,17 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/nav_emergency_contacts">
+    app:startDestination="@id/loginFragment">
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.carekeeper.ui.auth.LoginFragment"
+        android:label="Login">
+        <!-- 🔽 ação adicionada -->
+        <action
+            android:id="@+id/action_loginFragment_to_nav_emergency_contacts"
+            app:destination="@id/nav_emergency_contacts" />
+    </fragment>
 
     <fragment
         android:id="@+id/nav_emergency_contacts"

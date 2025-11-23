@@ -1,5 +1,6 @@
 package com.example.carekeeper.ui.settings;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -25,9 +26,7 @@ import java.util.List;
 public class SettingsFragment extends Fragment {
 
     private SharedPreferencesService prefsService;
-    private SwitchCompat switchDarkTheme;
     private TextInputEditText editMaxContacts;
-    private MaterialButton btnSalvar;
     private TextView textThemeLabel;
 
     @Override
@@ -37,9 +36,9 @@ public class SettingsFragment extends Fragment {
 
         prefsService = new SharedPreferencesService(requireContext());
 
-        switchDarkTheme = root.findViewById(R.id.switchDarkTheme);
+        SwitchCompat switchDarkTheme = root.findViewById(R.id.switchDarkTheme);
         editMaxContacts = root.findViewById(R.id.editMaxContacts);
-        btnSalvar = root.findViewById(R.id.btnSalvarConfig);
+        MaterialButton btnSalvar = root.findViewById(R.id.btnSalvarConfig);
         textThemeLabel = root.findViewById(R.id.textThemeLabel);
 
         // Estado inicial do tema
@@ -102,7 +101,8 @@ public class SettingsFragment extends Fragment {
     }
 
     private void vibrateShort() {
-        Vibrator vibrator = (Vibrator) requireContext().getSystemService(getContext().VIBRATOR_SERVICE);
+        getContext();
+        Vibrator vibrator = (Vibrator) requireContext().getSystemService(Context.VIBRATOR_SERVICE);
         if (vibrator != null) {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
