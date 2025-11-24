@@ -7,6 +7,7 @@ import com.example.carekeeper.dto.auth.LoginResponse;
 
 import retrofit2.Call;
 import retrofit2.http.Body;
+import retrofit2.http.Header;
 import retrofit2.http.POST;
 import retrofit2.http.Query;
 
@@ -17,6 +18,14 @@ public interface ApiService {
      */
     @POST("/autenticacao/login")
     Call<LoginResponse> login(@Body LoginRequest loginRequest);
+
+    /**
+     * Logout do usuário. O token JWT será adicionado automaticamente pelo interceptor.
+     *
+     * @return Void
+     */
+    @POST("/autenticacao/logout")
+    Call<Void> logout();
 
     /**
      * Envia leitura dos sensores.

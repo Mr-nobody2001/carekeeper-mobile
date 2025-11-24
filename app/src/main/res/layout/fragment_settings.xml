@@ -44,7 +44,7 @@
                 android:scaleY="1.15" />
         </LinearLayout>
 
-        <!-- Campo de texto grande -->
+        <!-- Campo máximo de contatos -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -55,7 +55,7 @@
             app:boxCornerRadiusBottomStart="20dp"
             app:boxCornerRadiusBottomEnd="20dp"
             app:boxStrokeColor="?attr/colorPrimary"
-            android:layout_marginBottom="36dp">
+            android:layout_marginBottom="24dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/editMaxContacts"
@@ -71,7 +71,33 @@
                 android:text="3" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Botão grande e arredondado -->
+        <!-- Novo campo: tempo de hold do botão de pânico (em segundos) -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Tempo de hold do botão (s)"
+            app:boxBackgroundMode="outline"
+            app:boxCornerRadiusTopStart="20dp"
+            app:boxCornerRadiusTopEnd="20dp"
+            app:boxCornerRadiusBottomStart="20dp"
+            app:boxCornerRadiusBottomEnd="20dp"
+            app:boxStrokeColor="?attr/colorPrimary"
+            android:layout_marginBottom="36dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/editHoldDuration"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:textSize="20sp"
+                android:textColor="?attr/colorPrimary"
+                android:inputType="numberDecimal"
+                android:text="3" /> <!-- valor inicial em segundos -->
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Botão salvar configurações -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSalvarConfig"
             android:layout_width="match_parent"
@@ -81,7 +107,22 @@
             android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="@android:color/white"
-            android:backgroundTint="?attr/colorPrimary"
+            android:backgroundTint="@color/primaryColor"
+            app:cornerRadius="60dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Botão de logout -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLogout"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:text="Sair do Aplicativo"
+            android:textAllCaps="false"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:backgroundTint="@color/primaryColor"
             app:cornerRadius="60dp" />
+
     </LinearLayout>
 </ScrollView>

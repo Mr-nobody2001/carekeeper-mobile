@@ -33,23 +33,18 @@ import com.example.carekeeper.service.SharedPreferencesService;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 
-import java.util.UUID;
-
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class PanicButtonFragment extends Fragment {
 
-    private static final long HOLD_DURATION_MS = 3000L;
+    private long holdDurationMs;
     private static final long RIPPLE_INTERVAL_MS = 1000L;
 
     private CircularProgressView circularProgress;
     private AppCompatButton panicButton;
     private View rippleWave;
-
-    private boolean triggered = false;
-    private boolean isHolding = false;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable panicRunnable;
@@ -78,16 +73,14 @@ public class PanicButtonFragment extends Fragment {
         rippleWave = view.findViewById(R.id.rippleWave);
 
         prefs = new SharedPreferencesService(requireContext());
+        holdDurationMs = prefs.getHoldDuration(); // pega do shared preferences
 
         api = ApiClient.getClientWithAuth(prefs).create(ApiService.class);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext());
 
         // 🔹 Carrega estado persistido
-        triggered = prefs.isAlertActive();
-        float savedProgress = prefs.getPanicProgress();
-
-        if (triggered) {
-            circularProgress.setProgress(savedProgress);
+        if (prefs.isPanicTriggered()) {
+            circularProgress.setProgress(prefs.getPanicProgress());
             startButtonFlashing();
             startAlertSound();
             startRippleLoop();
@@ -103,7 +96,7 @@ public class PanicButtonFragment extends Fragment {
     private void setupTouchListener() {
         panicButton.setOnClickListener(null);
         panicButton.setOnTouchListener((v, event) -> {
-            if (triggered) return true;
+            if (prefs.isPanicTriggered()) return true;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     startHold();
@@ -118,8 +111,7 @@ public class PanicButtonFragment extends Fragment {
     }
 
     private void startHold() {
-        if (triggered) return;
-        isHolding = true;
+        if (prefs.isPanicTriggered()) return;
 
         float startProgress = prefs.getPanicProgress();
         float remainingProgress = 1f - startProgress;
@@ -127,16 +119,14 @@ public class PanicButtonFragment extends Fragment {
         animateButtonScale(1f, 1.1f, 200);
 
         panicRunnable = () -> {
-            triggered = true;
-            prefs.setAlertActive(true);
+            prefs.setPanicTriggered(true);
             prefs.setPanicProgress(1f);
-            isHolding = false;
             onPanicTriggered();
         };
-        handler.postDelayed(panicRunnable, (long) (remainingProgress * HOLD_DURATION_MS));
+        handler.postDelayed(panicRunnable, (long) (remainingProgress * holdDurationMs));
 
         progressAnimator = ValueAnimator.ofFloat(startProgress, 1f);
-        progressAnimator.setDuration((long) (remainingProgress * HOLD_DURATION_MS));
+        progressAnimator.setDuration((long) (remainingProgress * holdDurationMs));
         progressAnimator.setInterpolator(new LinearInterpolator());
         progressAnimator.addUpdateListener(a -> {
             float progress = (float) a.getAnimatedValue();
@@ -147,15 +137,16 @@ public class PanicButtonFragment extends Fragment {
     }
 
     private void cancelHold() {
-        isHolding = false;
-        if (panicRunnable != null) handler.removeCallbacks(panicRunnable);
         if (progressAnimator != null) {
             progressAnimator.cancel();
             progressAnimator = null;
         }
+        if (panicRunnable != null) {
+            handler.removeCallbacks(panicRunnable);
+        }
         animateButtonScale(1.1f, 1f, 150);
 
-        if (!triggered) {
+        if (!prefs.isPanicTriggered()) {
             prefs.setPanicProgress(0f);
             circularProgress.reset();
         }
@@ -164,23 +155,19 @@ public class PanicButtonFragment extends Fragment {
     @SuppressLint("ClickableViewAccessibility")
     private void onPanicTriggered() {
         circularProgress.setProgress(1f);
-        prefs.setPanicProgress(1f);
-
         showRippleWaveEffect();
         startRippleLoop();
         startButtonFlashing();
         startAlertSound();
         triggerPanicButton();
-
         panicButton.setOnTouchListener(null);
         setupRestartListener();
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private void setupRestartListener() {
-        panicButton.setOnTouchListener(null);
         panicButton.setOnClickListener(v -> {
-            if (!triggered) return;
+            if (!prefs.isPanicTriggered()) return;
             stopAlertSound();
             stopRippleLoop();
             stopButtonFlashing();
@@ -190,18 +177,16 @@ public class PanicButtonFragment extends Fragment {
     }
 
     private void resetButtonState() {
-        triggered = false;
-        prefs.setAlertActive(false);
+        prefs.setPanicTriggered(false);
         prefs.setPanicProgress(0f);
-        circularProgress.reset();
 
+        circularProgress.reset();
         panicButton.setOnClickListener(null);
 
         if (flashAnimator != null) {
             flashAnimator.cancel();
             flashAnimator = null;
         }
-
         rippleWave.setVisibility(View.GONE);
     }
 
@@ -218,7 +203,7 @@ public class PanicButtonFragment extends Fragment {
                 .alpha(0f)
                 .setDuration(700)
                 .withEndAction(() -> {
-                    if (!triggered) rippleWave.setVisibility(View.GONE);
+                    if (!prefs.isPanicTriggered()) rippleWave.setVisibility(View.GONE);
                 })
                 .start();
 
@@ -230,7 +215,7 @@ public class PanicButtonFragment extends Fragment {
         rippleLoopRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!triggered) return;
+                if (!prefs.isPanicTriggered()) return;
                 showRippleWaveEffect();
                 handler.postDelayed(this, RIPPLE_INTERVAL_MS);
             }
@@ -243,7 +228,7 @@ public class PanicButtonFragment extends Fragment {
             handler.removeCallbacks(rippleLoopRunnable);
             rippleLoopRunnable = null;
         }
-        if (rippleWave != null) rippleWave.setVisibility(View.GONE);
+        rippleWave.setVisibility(View.GONE);
     }
 
     private void startButtonFlashing() {
@@ -254,10 +239,8 @@ public class PanicButtonFragment extends Fragment {
         flashAnimator.setRepeatMode(ValueAnimator.REVERSE);
         flashAnimator.addUpdateListener(animation -> {
             int color = (int) animation.getAnimatedValue();
-            // proteja cast em caso de drawable diferente
             if (panicButton.getBackground() instanceof GradientDrawable) {
-                GradientDrawable drawable = (GradientDrawable) panicButton.getBackground();
-                drawable.setColor(color);
+                ((GradientDrawable) panicButton.getBackground()).setColor(color);
             }
         });
         flashAnimator.start();
@@ -271,12 +254,8 @@ public class PanicButtonFragment extends Fragment {
     }
 
     private void animateButtonScale(float from, float to, long duration) {
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(panicButton, "scaleX", from, to);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(panicButton, "scaleY", from, to);
-        scaleX.setDuration(duration);
-        scaleY.setDuration(duration);
-        scaleX.start();
-        scaleY.start();
+        ObjectAnimator.ofFloat(panicButton, "scaleX", from, to).setDuration(duration).start();
+        ObjectAnimator.ofFloat(panicButton, "scaleY", from, to).setDuration(duration).start();
     }
 
     private void startAlertSound() {
@@ -292,12 +271,8 @@ public class PanicButtonFragment extends Fragment {
 
     private void stopAlertSound() {
         if (alertSound != null) {
-            try {
-                if (alertSound.isPlaying()) alertSound.stop();
-            } catch (IllegalStateException ignored) {}
-            try {
-                alertSound.release();
-            } catch (Exception ignored) {}
+            try { if (alertSound.isPlaying()) alertSound.stop(); } catch (Exception ignored) {}
+            try { alertSound.release(); } catch (Exception ignored) {}
             alertSound = null;
         }
     }
@@ -322,7 +297,6 @@ public class PanicButtonFragment extends Fragment {
             return;
         }
 
-        // 🔹 Verifica se há token JWT antes de prosseguir
         String token = prefs.getJwtToken();
         if (token == null || token.trim().isEmpty()) {
             Log.w("PanicButton", "⚠️ Nenhum token JWT encontrado. Ignorando envio do alerta.");
@@ -337,23 +311,17 @@ public class PanicButtonFragment extends Fragment {
                 prefs.setLastLocation(lat, lon);
             }
 
-            // 🔹 Monta o corpo do alerta
             PanicAlertRequest alertDTO = new PanicAlertRequest();
             alertDTO.setLeitura("Botão de pânico acionado");
             alertDTO.setLatitude(lat);
             alertDTO.setLongitude(lon);
 
-            // 🔹 Envia requisição (JWT é adicionado automaticamente via interceptor)
             api.triggerPanicButton(alertDTO).enqueue(new Callback<>() {
                 @Override
                 public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
-                    if (response.isSuccessful()) {
-                        Log.i("PanicButton", "🚨 Alerta de pânico enviado com sucesso!");
-                    } else if (response.code() == 401) {
-                        Log.w("PanicButton", "🔒 Token expirado ou inválido. Ignorando alerta.");
-                    } else {
-                        Log.w("PanicButton", "⚠️ Falha ao enviar alerta: código " + response.code());
-                    }
+                    if (response.isSuccessful()) Log.i("PanicButton", "🚨 Alerta de pânico enviado!");
+                    else if (response.code() == 401) Log.w("PanicButton", "🔒 Token expirado ou inválido.");
+                    else Log.w("PanicButton", "⚠️ Falha ao enviar alerta: " + response.code());
                 }
 
                 @Override

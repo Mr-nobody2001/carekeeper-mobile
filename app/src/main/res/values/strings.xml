@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">carekeeper</string>
+    <string name="app_name">CareKeeper</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="nav_header_title">Android Studio</string>
@@ -34,7 +34,7 @@
     <string name="nome">Nome</string>
     <string name="adicionar_contato">Adicionar contato</string>
     <string name="cancelar">Cancelar</string>
-    <string name="salvar">Salvar</string>
+    <string name="salvar">Salvar Alterações</string>
     <string name="ativar_alerta_autom_tico">Ativar alerta automático</string>
     <string name="m_ximo_de_contatos_personalizados">Máximo de contatos personalizados</string>
     <string name="configura_es">Configurações</string>

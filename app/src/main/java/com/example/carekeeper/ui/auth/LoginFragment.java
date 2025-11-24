@@ -13,13 +13,14 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 
-import com.example.carekeeper.MainActivity;
 import com.example.carekeeper.R;
 import com.example.carekeeper.dto.auth.LoginRequest;
 import com.example.carekeeper.dto.auth.LoginResponse;
 import com.example.carekeeper.network.ApiClient;
 import com.example.carekeeper.network.ApiService;
+import com.example.carekeeper.service.SensorService;
 import com.example.carekeeper.service.SharedPreferencesService;
+import com.example.carekeeper.utils.JwtUtils;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -49,14 +50,19 @@ public class LoginFragment extends Fragment {
         apiService = ApiClient.getClient().create(ApiService.class);
         prefs = new SharedPreferencesService(requireContext());
 
-        prefs.clearJwtToken();
-
-        // ✅ Se já está logado e o token não expirou, pula o login
+        // Se já está logado, mas primeiro verifica se o token expirou
         if (prefs.isLoggedIn()) {
-            NavHostFragment.findNavController(this)
-                    .navigate(R.id.action_loginFragment_to_nav_emergency_contacts);
-            ((MainActivity) requireActivity()).iniciarServicoSensoresSePermitido();
-            return view;
+            String token = prefs.getJwtToken();
+            if (JwtUtils.isTokenExpired(token)) {
+                // Token expirado → limpa token e não navega
+                prefs.clearJwtToken();
+            } else {
+                // Token válido → navega para tela principal
+                NavHostFragment.findNavController(this)
+                        .navigate(R.id.action_loginFragment_to_nav_emergency_contacts);
+                SensorService.iniciar(requireContext());
+                return view;
+            }
         }
 
         btnLogin.setOnClickListener(v -> performLogin());
@@ -68,13 +74,11 @@ public class LoginFragment extends Fragment {
         String email = inputEmail.getText() != null ? inputEmail.getText().toString().trim() : "";
         String password = inputPassword.getText() != null ? inputPassword.getText().toString().trim() : "";
 
-        // ✅ Valida campos
         if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) {
             Toast.makeText(getContext(), "Preencha todos os campos", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // ✅ Valida formato de email
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             Toast.makeText(getContext(), "Email inválido", Toast.LENGTH_SHORT).show();
             return;
@@ -85,7 +89,7 @@ public class LoginFragment extends Fragment {
 
         LoginRequest request = new LoginRequest(email, password);
 
-        apiService.login(request).enqueue(new Callback<LoginResponse>() {
+        apiService.login(request).enqueue(new Callback<>() {
             @Override
             public void onResponse(@NonNull Call<LoginResponse> call, @NonNull Response<LoginResponse> response) {
                 btnLogin.setEnabled(true);
@@ -95,15 +99,13 @@ public class LoginFragment extends Fragment {
                     String token = response.body().getToken();
 
                     if (token != null && !token.isEmpty()) {
-                        // ✅ Salva token JWT
                         prefs.saveJwtToken(token);
-
                         Toast.makeText(getContext(), "Login realizado com sucesso!", Toast.LENGTH_SHORT).show();
 
-                        // ✅ Inicia o serviço de sensores após login
-                        ((MainActivity) requireActivity()).iniciarServicoSensoresSePermitido();
+                        // Inicia o serviço de sensores
+                        SensorService.iniciar(requireContext());
 
-                        // ✅ Navega para a tela principal
+                        // Navega para a tela principal
                         NavHostFragment.findNavController(LoginFragment.this)
                                 .navigate(R.id.action_loginFragment_to_nav_emergency_contacts);
 

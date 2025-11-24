@@ -1,6 +1,8 @@
 package com.example.carekeeper.ui.emergency;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -38,7 +40,6 @@ import java.util.List;
 
 public class EmergencyContactsFragment extends Fragment {
 
-    private String numeroPendendeLigacao = null;
     private EmergencyContactsAdapter adapter;
     private SharedPreferencesService prefsService;
 
@@ -105,7 +106,8 @@ public class EmergencyContactsFragment extends Fragment {
         seletorImagemLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
-                    if (result.getResultCode() == getActivity().RESULT_OK && result.getData() != null) {
+                    getActivity();
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                         imagemSelecionada = result.getData().getData();
                         if (imagemSelecionada != null && imagePreview != null) {
                             imagePreview.setImageURI(imagemSelecionada);
@@ -131,9 +133,12 @@ public class EmergencyContactsFragment extends Fragment {
                     Toast.LENGTH_LONG).show();
             return;
         }
-        mostrarDialogoContato(null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            mostrarDialogoContato(null);
+        }
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     private void mostrarDialogoContato(EmergencyContact contatoExistente) {
         imagemSelecionada = (contatoExistente != null && contatoExistente.imageUri != null)
@@ -316,7 +321,6 @@ public class EmergencyContactsFragment extends Fragment {
             holder.itemView.setOnClickListener(v -> {
                 if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CALL_PHONE)
                         != PackageManager.PERMISSION_GRANTED) {
-                    numeroPendendeLigacao = contact.phone;
                     requestPermissions(new String[]{Manifest.permission.CALL_PHONE}, 100);
                 } else {
                     ligarNumero(contact.phone);
@@ -325,7 +329,9 @@ public class EmergencyContactsFragment extends Fragment {
 
             if (position >= contacts.size()) {
                 holder.itemView.setOnLongClickListener(v -> {
-                    mostrarDialogoContato(customContacts.get(position - contacts.size()));
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        mostrarDialogoContato(customContacts.get(position - contacts.size()));
+                    }
                     return true;
                 });
             }

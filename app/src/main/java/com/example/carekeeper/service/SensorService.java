@@ -1,11 +1,13 @@
 package com.example.carekeeper.service;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -21,13 +23,12 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
 import com.example.carekeeper.dto.SensorDTO;
 import com.example.carekeeper.network.ApiClient;
 import com.example.carekeeper.network.ApiService;
-
-import java.util.UUID;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -56,16 +57,44 @@ public class SensorService extends Service implements SensorEventListener, Locat
         }
     };
 
+    // ===========================================================
+    // =============== MÉTODOS ESTÁTICOS PARA ACTIVITY ==========
+    // ===========================================================
+    public static void iniciar(Context context) {
+        // Verifica permissões de localização
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    (android.app.Activity) context,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                    100
+            );
+            return;
+        }
+
+        Intent serviceIntent = new Intent(context, SensorService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent);
+        } else {
+            context.startService(serviceIntent);
+        }
+    }
+
+    public static void parar(Context context) {
+        Intent serviceIntent = new Intent(context, SensorService.class);
+        context.stopService(serviceIntent);
+    }
+
+    // ===========================================================
+    // =============== MÉTODOS DO SERVICE =======================
+    // ===========================================================
     @Override
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "Iniciando SensorService...");
 
         sharedPreferencesService = new SharedPreferencesService(this);
-
-        // Cria ApiService com JWT
-        apiService = ApiClient.getClientWithAuth(sharedPreferencesService)
-                .create(ApiService.class);
+        apiService = ApiClient.getClientWithAuth(sharedPreferencesService).create(ApiService.class);
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -126,14 +155,12 @@ public class SensorService extends Service implements SensorEventListener, Locat
     private void enviarLeitura() {
         boolean isAlertActive = sharedPreferencesService.isAlertActive();
 
-        // 🔹 Verifica se o token JWT está salvo
         String token = sharedPreferencesService.getJwtToken();
         if (token == null || token.trim().isEmpty()) {
             Log.w(TAG, "⚠️ Nenhum token JWT encontrado. Ignorando envio da leitura.");
             return;
         }
 
-        // 🔹 Monta o DTO com dados dos sensores
         SensorDTO leitura = new SensorDTO(
                 ax, ay, az,
                 gx, gy, gz,
@@ -141,9 +168,7 @@ public class SensorService extends Service implements SensorEventListener, Locat
                 System.currentTimeMillis()
         );
 
-        // 🔹 Envia a leitura normalmente (JWT vai no cabeçalho via interceptor)
         Call<Void> call = apiService.sendReading(leitura, isAlertActive);
-
         call.enqueue(new Callback<>() {
             @Override
             public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
@@ -189,8 +214,8 @@ public class SensorService extends Service implements SensorEventListener, Locat
     public void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(envioPeriodico);
-        sensorManager.unregisterListener(this);
-        locationManager.removeUpdates(this);
+        if (sensorManager != null) sensorManager.unregisterListener(this);
+        if (locationManager != null) locationManager.removeUpdates(this);
         Log.i(TAG, "🛑 Serviço de sensores encerrado.");
     }
 

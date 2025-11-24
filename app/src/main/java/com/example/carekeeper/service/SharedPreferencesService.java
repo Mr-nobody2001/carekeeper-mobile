@@ -14,49 +14,62 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Serviço centralizado de SharedPreferences para o app CareKeeper.
- *
+ * Serviço centralizado para estado de pânico e SharedPreferences no app CareKeeper.
  * Gerencia:
- *  - Estado do alerta
+ *  - Estado do alerta em memória (PanicStateService)
  *  - Progresso e estado do botão de pânico
  *  - Localização atual
  *  - Contatos personalizados
  *  - Configurações gerais do app
  *  - Token JWT de autenticação
  *  - Preferência de tema (claro/escuro)
+ *  - Duração de hold do botão de pânico
  */
 public class SharedPreferencesService {
 
+    // ===========================================================
+    // =============== ESTADO DE PÂNICO EM MEMÓRIA ==============
+    // ===========================================================
+    public static class PanicState {
+        public static boolean triggered = false;
+        public static float progress = 0f;
+        public static double currentLatitude = 0.0;
+        public static double currentLongitude = 0.0;
+
+        public static void reset() {
+            triggered = false;
+            progress = 0f;
+            currentLatitude = 0.0;
+            currentLongitude = 0.0;
+        }
+    }
+
+    // ===========================================================
+    // =============== SHARED PREFERENCES =======================
+    // ===========================================================
     private static final String PREF_NAME = "carekeeper_prefs";
     private final SharedPreferences prefs;
     private final Gson gson = new Gson();
 
-    // ===========================================================
-    // =============== CHAVES DE CONFIGURAÇÃO ====================
-    // ===========================================================
-
     private static final String KEY_IS_ALERT_ACTIVE = "isAlertActive";
     private static final String KEY_PANIC_PROGRESS = "panicProgress";
     private static final String KEY_PANIC_TRIGGERED = "panicTriggered";
-
     private static final String KEY_LATITUDE = "currentLatitude";
     private static final String KEY_LONGITUDE = "currentLongitude";
-
     private static final String KEY_CUSTOM_CONTACTS = "custom_contacts";
     private static final String KEY_MAX_CUSTOM_CONTACTS = "maxCustomContacts";
-
     private static final String KEY_DARK_THEME = "isDarkTheme";
     private static final String KEY_JWT_TOKEN = "jwt_token";
     private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_HOLD_DURATION = "holdDurationMs"; // NOVO
 
     public SharedPreferencesService(Context context) {
         this.prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
     }
 
     // ===========================================================
-    // =============== AUTENTICAÇÃO JWT ==========================
+    // =============== AUTENTICAÇÃO JWT =========================
     // ===========================================================
-
     public void saveJwtToken(String token) {
         prefs.edit().putString(KEY_JWT_TOKEN, token).apply();
     }
@@ -76,9 +89,8 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== ESTADO DO ALERTA ==========================
+    // =============== ESTADO DO ALERTA =========================
     // ===========================================================
-
     public void setAlertActive(boolean active) {
         prefs.edit().putBoolean(KEY_IS_ALERT_ACTIVE, active).apply();
     }
@@ -88,11 +100,11 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== PROGRESSO DO BOTÃO DE PÂNICO ==============
+    // =============== PROGRESSO DO BOTÃO DE PÂNICO ============
     // ===========================================================
-
     public void setPanicProgress(float progress) {
         prefs.edit().putFloat(KEY_PANIC_PROGRESS, progress).apply();
+        PanicState.progress = progress;
     }
 
     public float getPanicProgress() {
@@ -101,6 +113,7 @@ public class SharedPreferencesService {
 
     public void setPanicTriggered(boolean triggered) {
         prefs.edit().putBoolean(KEY_PANIC_TRIGGERED, triggered).apply();
+        PanicState.triggered = triggered;
     }
 
     public boolean isPanicTriggered() {
@@ -108,14 +121,15 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== LOCALIZAÇÃO ATUAL =========================
+    // =============== LOCALIZAÇÃO ATUAL ========================
     // ===========================================================
-
     public void setLastLocation(double latitude, double longitude) {
         prefs.edit()
                 .putLong(KEY_LATITUDE, Double.doubleToRawLongBits(latitude))
                 .putLong(KEY_LONGITUDE, Double.doubleToRawLongBits(longitude))
                 .apply();
+        PanicState.currentLatitude = latitude;
+        PanicState.currentLongitude = longitude;
     }
 
     public double getLastLatitude() {
@@ -127,9 +141,8 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== CONTATOS PERSONALIZADOS ===================
+    // =============== CONTATOS PERSONALIZADOS ==================
     // ===========================================================
-
     public void salvarContatosPersonalizados(List<EmergencyContact> contatos) {
         prefs.edit().putString(KEY_CUSTOM_CONTACTS, gson.toJson(contatos)).apply();
     }
@@ -147,9 +160,8 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== CONFIGURAÇÕES GERAIS ======================
+    // =============== CONFIGURAÇÕES GERAIS =====================
     // ===========================================================
-
     public void setMaxCustomContacts(int max) {
         prefs.edit().putInt(KEY_MAX_CUSTOM_CONTACTS, max).apply();
     }
@@ -159,9 +171,8 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== TEMA CLARO / ESCURO =======================
+    // =============== TEMA CLARO / ESCURO ======================
     // ===========================================================
-
     public void setDarkThemeEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_DARK_THEME, enabled).apply();
     }
@@ -171,10 +182,21 @@ public class SharedPreferencesService {
     }
 
     // ===========================================================
-    // =============== LIMPEZA GERAL =============================
+    // =============== HOLD DURATION ============================
     // ===========================================================
+    public void setHoldDuration(long durationMs) {
+        prefs.edit().putLong(KEY_HOLD_DURATION, durationMs).apply();
+    }
 
+    public long getHoldDuration() {
+        return prefs.getLong(KEY_HOLD_DURATION, 3000L); // valor padrão 3s
+    }
+
+    // ===========================================================
+    // =============== LIMPEZA GERAL ============================
+    // ===========================================================
     public void limparTudo() {
         prefs.edit().clear().apply();
+        PanicState.reset();
     }
 }

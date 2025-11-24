@@ -8,7 +8,6 @@
         android:id="@+id/loginFragment"
         android:name="com.example.carekeeper.ui.auth.LoginFragment"
         android:label="Login">
-        <!-- 🔽 ação adicionada -->
         <action
             android:id="@+id/action_loginFragment_to_nav_emergency_contacts"
             app:destination="@id/nav_emergency_contacts" />
@@ -27,5 +26,10 @@
     <fragment
         android:id="@+id/nav_settings"
         android:name="com.example.carekeeper.ui.settings.SettingsFragment"
-        android:label="Configurações" />
+        android:label="Configurações" >
+
+        <action
+            android:id="@+id/action_settings_to_login"
+            app:destination="@id/loginFragment" />
+    </fragment>
 </navigation>
